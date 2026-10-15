@@ -40,7 +40,11 @@ logging {
 // que "74770e262a0f…".
 discovery.docker "contenedores" {
   host             = "unix:///var/run/docker.sock"
-  refresh_interval = "30s"
+  // 5 s y no 30 s: los pases cortos de `docker compose run --rm` (menos de
+  // 30 s) se descubrían cuando su contenedor ya estaba borrado, y Alloy los
+  // saltaba con "failed to create source": ~26 pases al día sin un solo log.
+  // Preguntar al socket local cada 5 s no cuesta nada.
+  refresh_interval = "5s"
 
   filter {
     name   = "status"
