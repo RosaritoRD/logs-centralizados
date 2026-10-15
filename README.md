@@ -1,9 +1,10 @@
 <div align="center">
 
-# 📜 Logs centralizados
+# 📜 Centralized Logs
 
-**Todos los logs de tu VPS —contenedores Docker y sistema— en un solo buscador, con dashboards de seguridad listos. Ocupa ~260 MB de RAM.**
+**Every log on your VPS — Docker containers and the host system — in a single search box, with ready-made security dashboards. Uses ~260 MB of RAM.**
 
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/docker-compose-2496ED.svg)](docker-compose.yml)
 [![Grafana](https://img.shields.io/badge/Grafana-Loki%20%2B%20Alloy-F46800.svg)](https://grafana.com/oss/loki/)
 [![Docs](https://img.shields.io/badge/docs-KEIZAC%20TECH-black.svg)](https://keizactech.com/docs)
@@ -12,74 +13,77 @@
 
 ---
 
-## ✨ Qué hace
+## ✨ What it does
 
-- Junta los logs de **todos tus contenedores** y del **host** (`auth.log`, `fail2ban`, `ufw`, `syslog`).
-- Los puedes buscar desde **Grafana** con filtros como `{container="mi-api"} |= "error"`.
-- Trae **2 dashboards** listos:
-  - **Seguridad del servidor**: contraseñas SSH falladas, usuarios inventados, sondas al escritorio remoto, accesos correctos y bloqueos de fail2ban.
-  - **Contenedores**: errores por contenedor y volumen de líneas.
+- Collects the logs of **all your containers** and the **host** (`auth.log`, `fail2ban`, `ufw`, `syslog`).
+- Lets you search them from **Grafana** with filters like `{container="my-api"} |= "error"`.
+- Ships **2 ready-made dashboards** (panel titles are in Spanish):
+  - **Server security**: failed SSH passwords, made-up usernames, remote-desktop probes, successful logins and fail2ban bans.
+  - **Containers**: errors per container and log volume.
 
-## 🧠 Cómo funciona
+## 🧠 How it works
 
 ```mermaid
 flowchart LR
-    D[Contenedores Docker] -->|socket, solo lectura| A[Alloy]
-    H[/var/log del host/] -->|solo lectura| A
-    A --> L[Loki<br/>guarda 30 días]
-    L --> G[Grafana<br/>buscador + dashboards]
-    G -->|HTTPS por tu proxy| T((Tú))
+    D[Docker containers] -->|socket, read-only| A[Alloy]
+    H[/host /var/log/] -->|read-only| A
+    A --> L[Loki<br/>keeps 30 days]
+    L --> G[Grafana<br/>search + dashboards]
+    G -->|HTTPS via your proxy| T((You))
 ```
 
-| Pieza | Qué hace | RAM medida |
+| Piece | What it does | Measured RAM |
 |---|---|---|
-| **Alloy** | Recoge los logs. Monta `/var/log` y el socket de Docker en **solo lectura** | ~65 MB |
-| **Loki** | Los guarda. Indexa solo las etiquetas, no cada palabra | ~87 MB |
-| **Grafana** | Buscador y dashboards. Es lo único expuesto al proxy | ~108 MB |
+| **Alloy** | Collects the logs. Mounts `/var/log` and the Docker socket **read-only** | ~65 MB |
+| **Loki** | Stores them. Indexes only the labels, not every word | ~87 MB |
+| **Grafana** | Search and dashboards. The only thing exposed to the proxy | ~108 MB |
 
-### La regla de oro
-**Lo que vigila no puede depender de lo vigilado.** Va en su propio `docker compose`: si tu web o tu API se caen, el visor sigue en pie para que puedas ver por qué.
+### The golden rule
+**The watcher can't depend on what it watches.** It runs in its own `docker compose`: if your site or your API goes down, the log viewer stays up so you can see why.
 
-## 🚀 Arranque rápido
+## 🚀 Quick start
 
 ```bash
 git clone https://github.com/RosaritoRD/logs-centralizados.git
 cd logs-centralizados
-cp .env.example .env          # pon el nombre de la red de tu proxy
-# Crea .env.grafana con tu usuario y contraseña de Grafana (ver abajo)
+cp .env.example .env          # set your proxy's network name
+# Create .env.grafana with your Grafana user and password (see below)
 docker compose up -d
-docker compose logs -f alloy  # comprobar que recoge sin errores
+docker compose logs -f alloy  # check it's collecting without errors
 ```
 
-`.env.grafana` (permisos `600`, **nunca a git**):
+`.env.grafana` (permissions `600`, **never commit it**):
 ```
-GF_SECURITY_ADMIN_USER=AQUI_VA_TU_USUARIO
-GF_SECURITY_ADMIN_PASSWORD=AQUI_VA_UNA_CONTRASEÑA_LARGA
-```
-
-⚠️ Grafana solo aplica ese usuario y esa contraseña **la primera vez que arranca**, con la base de datos vacía. Para cambiarlos después hay que borrar su volumen y volver a arrancar. No se pierde nada, porque los dashboards y la fuente de datos vienen de archivos.
-
-### Consultas útiles (Grafana → Explore)
-
-```
-{origen="host", job="ssh"}   |= "Failed password"   # intentos de entrar por SSH
-{container="mi-api"}         |= "error"              # errores de un contenedor
-{container=~"n8n.*"}                                 # varios contenedores a la vez
+GF_SECURITY_ADMIN_USER=YOUR_USERNAME_HERE
+GF_SECURITY_ADMIN_PASSWORD=A_LONG_PASSWORD_HERE
 ```
 
-## 🔒 Seguridad
-- Alloy lo monta todo en **solo lectura**: no puede tocar tus contenedores ni tus archivos.
-- Cada servicio tiene `mem_limit`. Una consulta pesada no se lleva la RAM de tus apps.
-- Los dashboards se editan en el JSON, no desde la interfaz (`allowUiUpdates: false`). Así lo que ves es lo que está en git.
+⚠️ Grafana only applies that user and password **the first time it starts**, with an empty database. To change them later, delete its volume and start again. You lose nothing, because the dashboards and the data source come from files.
 
-## 🤖 Con Claude Code o Codex
-Abre la carpeta con `claude` o `codex` y pídele, por ejemplo: *"Añade un panel con los errores 5xx de nginx"* o *"Haz que Alloy recoja también /var/log/nginx"*.
+### Useful queries (Grafana → Explore)
 
-## 💸 Ahorro y mejoras
-Ver **[AHORRO-Y-MEJORAS.md](AHORRO-Y-MEJORAS.md)**.
+```
+{origen="host", job="ssh"}   |= "Failed password"   # SSH login attempts
+{container="my-api"}         |= "error"              # errors from one container
+{container=~"n8n.*"}                                 # several containers at once
+```
 
-## 📚 Más
-📖 Guías y más proyectos: **[keizactech.com/docs](https://keizactech.com/docs)**
+## 🔒 Security
+- Alloy mounts everything **read-only**: it can't touch your containers or your files.
+- Every service has a `mem_limit`. A heavy query won't eat your apps' RAM.
+- Dashboards are edited in JSON, not from the UI (`allowUiUpdates: false`). What you see is what's in git.
 
-## 📄 Licencia
-MIT — ver [LICENSE](LICENSE).
+## 🤖 With Claude Code or Codex
+Open the folder with `claude` or `codex` and ask, for example: *"Add a panel with nginx 5xx errors"* or *"Make Alloy also collect /var/log/nginx"*.
+
+## 💸 Savings and tips
+See **[SAVINGS-AND-TIPS.md](SAVINGS-AND-TIPS.md)**.
+
+## 🤝 Contributing
+Issues and PRs are welcome — look for the [`good first issue`](https://github.com/RosaritoRD/logs-centralizados/labels/good%20first%20issue) label and read [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## 📚 More
+📖 Guides and more projects: **[keizactech.com/docs](https://keizactech.com/docs)**
+
+## 📄 License
+MIT — see [LICENSE](LICENSE).
