@@ -1,15 +1,15 @@
-#  carga los dashboards del directorio, en cada arranque.
+#  loads the dashboards from the directory on every start.
 #
-# `allowUiUpdates: false`: el dashboard es un fichero del repo, no algo que se
-# edita en la interfaz y se pierde al recrear el contenedor. Para cambiarlo se
-# toca el JSON y se reinicia — así lo que se ve en pantalla y lo que está en
-# git son siempre lo mismo.
+# `allowUiUpdates: false`: the dashboard is a file in the repo, not something
+# edited in the UI and lost when the container is recreated. To change it, edit
+# the JSON and restart — so what you see on screen and what's in git are always
+# the same.
 apiVersion: 1
 
 providers:
   - name: logs
     orgId: 1
-    folder: Servidor
+    folder: Server
     type: file
     disableDeletion: false
     allowUiUpdates: false

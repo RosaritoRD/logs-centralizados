@@ -1,32 +1,32 @@
-#  registros centralizados (logs.tu-dominio.com).
+#  centralized logs (logs.your-domain.com).
 #
-# ESTE STACK VIVE APARTE A PROPÓSITO.
+# THIS STACK LIVES ON ITS OWN ON PURPOSE.
 #
-# No está en la carpeta de tu web ni en su docker-compose. La razón es simple y es
-# la regla de oro: lo que VIGILA no puede depender de lo VIGILADO. Si un
-# despliegue de la web sale mal, o el contenedor `website` no arranca, el
-# visor de logs es justo lo que hace falta mirar — y tiene que seguir en pie.
+# It isn't in your website's folder or its docker-compose. The reason is simple: what
+# WATCHES can't depend on what is WATCHED. If a website deploy goes wrong, or the
+# `website` container won't start, the log viewer is exactly what you need to
+# look at — and it has to stay up.
 #
-# Lo único que se comparte es Nginx Proxy Manager, que es quien termina el
-# TLS de todo el servidor. Y ni siquiera se pasa por el nginx del sitio: el
-# reenvío de logs.tu-dominio.com está en /data/nginx/custom/http.conf de NPM,
-# un fichero que la interfaz de NPM no toca nunca.
+# The only shared piece is Nginx Proxy Manager, which terminates TLS for the
+# whole server. It doesn't even go through the site's nginx: the proxy for
+# logs.your-domain.com lives in NPM's /data/nginx/custom/http.conf, a file the
+# NPM UI never touches.
 #
-# Arrancar:   cd /opt/logs-centralizados && docker compose up -d
-# Parar:      docker compose down          (no afecta a la web para nada)
+# Start:   cd /opt/logs-centralizados && docker compose up -d
+# Stop:    docker compose down          (doesn't affect the website at all)
 
 services:
-  # El almacén. NO indexa el contenido de los logs, solo las etiquetas
-  # (contenedor, host, fichero). Por eso cabe aquí: un Elasticsearch indexando
-  # cada palabra pediría 2-4 GB, y esta VPS ya tiene 2,6 GB en swap.
+  # The store. It does NOT index log content, only labels (container, host,
+  # file). That's why it fits here: an Elasticsearch indexing every word would
+  # want 2-4 GB, and this VPS already has 2.6 GB in swap.
   loki:
     image: grafana/loki:3.3.2
     container_name: logs-loki
     restart: unless-stopped
     command: -config.file=/etc/loki/config.yaml
-    # Los tres llevan tope de memoria. Sin él, una consulta pesada podría
-    # llevarse la RAM que necesitan n8n y la API: el visor de logs tumbando la
-    # plataforma que vigila sería el peor final posible.
+    # All three have a memory cap. Without it, a heavy query could take the RAM
+    # that n8n and the API need: the log viewer taking down the platform it
+    # watches would be the worst possible ending.
     mem_limit: 512m
     volumes:
       - ./loki-config.yaml:/etc/loki/config.yaml:ro
@@ -34,10 +34,9 @@ services:
     networks:
       - logs_internal
 
-  # El recolector. Lee los logs de todos los contenedores por el socket de
-  # Docker y los ficheros del host (/var/log). Los DOS montajes son de SOLO
-  # LECTURA: Alloy lee, no tiene por qué escribir en /var/log ni mandarle
-  # órdenes al demonio de Docker.
+  # The collector. It reads every container's logs (via the Docker socket) and
+  # the host files (/var/log). BOTH mounts are READ-ONLY: Alloy reads; it has no
+  # business writing to /var/log or giving orders to the Docker daemon.
   alloy:
     image: grafana/alloy:v1.18.1
     container_name: logs-alloy
@@ -46,18 +45,18 @@ services:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
       - --storage.path=/var/lib/alloy/data
-      # Sin telemetría anónima a Grafana Labs. Además de no querer mandarla,
-      # su "reporter" suelta un error en cada arranque y parada que ensucia
-      # justo el registro que este stack existe para leer.
+      # No anonymous telemetry to Grafana Labs. Besides not wanting to send it,
+      # its "reporter" logs an error on every start and stop, polluting exactly
+      # the log this stack exists to read.
       - --disable-reporting
       - /etc/alloy/config.alloy
     mem_limit: 256m
     volumes:
       - ./alloy-config.alloy:/etc/alloy/config.alloy:ro
       - /var/log:/var/log:ro
-      # Los logs de los contenedores se leen del DISCO, no de la API de Docker
-      # (ver el porqué largo en alloy-config.alloy). El socket se conserva solo
-      # para traducir id -> nombre de contenedor.
+      # Container logs are read from DISK, not the Docker API (see the long
+      # explanation in alloy-config.alloy). The socket is kept only to map
+      # id -> container name.
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - alloy_data:/var/lib/alloy/data
@@ -66,25 +65,25 @@ services:
     depends_on:
       - loki
 
-  # La cara visible. Es el ÚNICO de los tres que sale a la red del proxy:
-  # Loki y Alloy viven en una red interna sin salida.
+  # The visible face. It's the ONLY one of the three on the proxy network:
+  # Loki and Alloy live on an internal network with no way out.
   grafana:
     image: grafana/grafana:11.4.0
     container_name: logs-grafana
     restart: unless-stopped
     mem_limit: 384m
     env_file:
-      - ./.env.grafana          # usuario y contraseña, fuera de git (0600)
+      - ./.env.grafana          # user and password, kept out of git (0600)
     environment:
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       GF_NEWS_NEWS_FEED_ENABLED: "false"
-      GF_SERVER_ROOT_URL: "https://logs.tu-dominio.com"
+      GF_SERVER_ROOT_URL: "https://logs.your-domain.com"
     volumes:
-      # Origen de datos Y dashboards, los dos provisionados: lo que se ve en
-      # pantalla y lo que está en git son siempre lo mismo.
+      # Data source AND dashboards are both provisioned: what you see on screen
+      # and what's in git are always the same.
       - ./grafana-provisioning:/etc/grafana/provisioning:ro
       - ./dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
@@ -95,10 +94,10 @@ services:
       - loki
 
 networks:
-  # Loki y Alloy no se alcanzan desde fuera: solo Grafana los consulta.
+  # Loki and Alloy can't be reached from outside: only Grafana queries them.
   logs_internal:
     internal: true
-  # La red donde vive Nginx Proxy Manager. Es lo ÚNICO compartido con el resto.
+  # The network where Nginx Proxy Manager lives. The ONLY thing shared with the rest.
   proxy:
     external: true
     name: ${PROXY_NETWORK:-npm_default}

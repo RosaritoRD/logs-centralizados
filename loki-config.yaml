@@ -1,16 +1,16 @@
-#  Loki, el almacén de logs.
+#  Loki, the log store.
 #
-# Loki NO indexa el contenido de los logs, solo las etiquetas (contenedor,
-# host, fichero). Por eso cabe en esta VPS: un Elasticsearch indexando cada
-# palabra necesitaría varios GB, y aquí ya hay 2,6 GB en swap.
+# Loki does NOT index log content, only labels (container, host, file).
+# That's why it fits on this VPS: an Elasticsearch indexing every word would
+# need several GB, and there are already 2.6 GB in swap here.
 #
-# Todo en disco local, sin dependencias externas.
+# Everything on local disk, no external dependencies.
 
 auth_enabled: false
 
 server:
   http_listen_port: 3100
-  # Solo la red interna de Docker lo alcanza; Grafana es quien lo consulta.
+  # Only the internal Docker network can reach it; Grafana is the one querying it.
   http_listen_address: 0.0.0.0
   log_level: warn
 
@@ -37,17 +37,17 @@ schema_config:
         period: 24h
 
 limits_config:
-  # 30 días. Un log de hace dos meses no lo mira nadie y sí ocupa disco: hay
-  # 59 GB libres y esta máquina también guarda fotos de inspección.
+  # 30 days. Nobody looks at a two-month-old log, but it does take disk: there
+  # are 59 GB free and this machine also stores inspection photos.
   retention_period: 720h
-  # Los contenedores escupen ráfagas al arrancar; sin esto Loki las rechaza.
+  # Containers spit out bursts on startup; without this Loki rejects them.
   ingestion_rate_mb: 8
   ingestion_burst_size_mb: 16
   reject_old_samples: true
-  # 720h y no 168h: los contenedores llevan semanas escribiendo, y en el primer
-  # arranque Alloy manda TODO ese histórico. Con 7 días, Loki devolvía 400 a
-  # cada lote y se perdía lo anterior. Igualado a la retención: se acepta todo
-  # lo que se va a conservar, ni un día más.
+  # 720h, not 168h: the containers have been writing for weeks, and on first
+  # start Alloy sends ALL of that backlog. With 7 days, Loki returned 400 for
+  # every batch and the older lines were lost. Matched to retention: accept
+  # everything that will be kept, not a day more.
   reject_old_samples_max_age: 720h
   max_query_series: 5000
 

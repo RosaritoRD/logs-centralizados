@@ -1,8 +1,8 @@
-#  Loki queda enchufado solo al arrancar Grafana.
+#  Loki gets wired in automatically when Grafana starts.
 #
-# El `uid` es FIJO a propósito. Sin él Grafana genera uno aleatorio en cada
-# instalación, y los paneles del dashboard —que referencian el origen de datos
-# por uid— aparecerían vacíos al recrear el contenedor, sin decir por qué.
+# The `uid` is FIXED on purpose. Without it Grafana generates a random one on
+# every install, and the dashboard panels — which reference the data source by
+# uid — would show up empty after recreating the container, with no reason given.
 apiVersion: 1
 
 datasources:

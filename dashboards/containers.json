@@ -1,8 +1,8 @@
 {
-  "uid": "logs-plataforma",
-  "title": "Contenedores",
-  "description": "Salud de los contenedores: quién escribe, quién se queja y qué dijo exactamente. Cubre la web, la API, n8n, los workers y el resto de proyectos de la VPS.",
-  "tags": ["servidor", "plataforma"],
+  "uid": "logs-containers",
+  "title": "Containers",
+  "description": "Container health: who is writing, who is complaining and exactly what they said. Covers the website, the API, n8n, the workers and every other project on the VPS.",
+  "tags": ["server", "platform"],
   "timezone": "utc",
   "editable": false,
   "schemaVersion": 39,
@@ -12,8 +12,8 @@
   "templating": {
     "list": [
       {
-        "name": "contenedor",
-        "label": "Contenedor",
+        "name": "container",
+        "label": "Container",
         "type": "query",
         "datasource": { "type": "loki", "uid": "loki" },
         "query": { "label": "container", "refId": "var" },
@@ -29,15 +29,15 @@
   "panels": [
     {
       "type": "row",
-      "title": "Errores",
+      "title": "Errors",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "collapsed": false,
       "panels": []
     },
     {
       "type": "stat",
-      "title": "Líneas con error",
-      "description": "Solo líneas de NIVEL error (level=error, ERROR:, [error]). Buscar la palabra suelta contaba de más: Grafana escribe error=\"database is locked\" en líneas de nivel info, y salían 23 errores donde no había ninguno.",
+      "title": "Error lines",
+      "description": "Only error-LEVEL lines (level=error, ERROR:, [error]). Searching for the bare word overcounted: Grafana writes error=\"database is locked\" on info-level lines, and 23 errors showed up where there were none.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 5, "w": 8, "x": 0, "y": 1 },
       "options": {
@@ -63,15 +63,15 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum(count_over_time({origen=\"docker\", container=~\"$contenedor\"} |~ \"(?i)(level=error|error:|\\\\[error\\\\])\" [$__range]))",
+          "expr": "sum(count_over_time({source=\"docker\", container=~\"$container\"} |~ \"(?i)(level=error|error:|\\\\[error\\\\])\" [$__range]))",
           "queryType": "instant"
         }
       ]
     },
     {
       "type": "stat",
-      "title": "Contenedores escribiendo",
-      "description": "Si este número baja de golpe, algo dejó de arrancar.",
+      "title": "Containers writing",
+      "description": "If this number suddenly drops, something stopped starting.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 5, "w": 8, "x": 8, "y": 1 },
       "options": {
@@ -83,15 +83,15 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "count(sum by (container) (count_over_time({origen=\"docker\"} [$__range])))",
+          "expr": "count(sum by (container) (count_over_time({source=\"docker\"} [$__range])))",
           "queryType": "instant"
         }
       ]
     },
     {
       "type": "stat",
-      "title": "Líneas totales",
-      "description": "Volumen de logs del rango. Un salto sin motivo suele ser un bucle de reintentos.",
+      "title": "Total lines",
+      "description": "Log volume for the range. A jump for no reason is usually a retry loop.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 5, "w": 8, "x": 16, "y": 1 },
       "options": {
@@ -103,15 +103,15 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum(count_over_time({origen=\"docker\", container=~\"$contenedor\"} [$__range]))",
+          "expr": "sum(count_over_time({source=\"docker\", container=~\"$container\"} [$__range]))",
           "queryType": "instant"
         }
       ]
     },
     {
       "type": "timeseries",
-      "title": "Errores por contenedor",
-      "description": "Quién se está quejando y desde cuándo. Aquí es donde se ve qué empezó a fallar y a qué hora.",
+      "title": "Errors by container",
+      "description": "Who is complaining and since when. This is where you see what started failing and at what time.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 9, "w": 24, "x": 0, "y": 6 },
       "fieldConfig": {
@@ -128,14 +128,14 @@
           "refId": "A",
           "legendFormat": "{{container}}",
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum by (container) (count_over_time({origen=\"docker\", container=~\"$contenedor\"} |~ \"(?i)(level=error|error:|\\\\[error\\\\])\" [15m]))",
+          "expr": "sum by (container) (count_over_time({source=\"docker\", container=~\"$container\"} |~ \"(?i)(level=error|error:|\\\\[error\\\\])\" [15m]))",
           "queryType": "range"
         }
       ]
     },
     {
       "type": "logs",
-      "title": "Los errores, uno a uno",
+      "title": "The errors, one by one",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 11, "w": 24, "x": 0, "y": 15 },
       "options": {
@@ -147,21 +147,21 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{origen=\"docker\", container=~\"$contenedor\"} |~ \"(?i)(level=error|error:|\\\\[error\\\\])\"",
+          "expr": "{source=\"docker\", container=~\"$container\"} |~ \"(?i)(level=error|error:|\\\\[error\\\\])\"",
           "queryType": "range"
         }
       ]
     },
     {
       "type": "row",
-      "title": "Volumen",
+      "title": "Volume",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
       "collapsed": true,
       "panels": [
         {
           "type": "timeseries",
-          "title": "Líneas por contenedor",
-          "description": "Todo lo que escribe cada uno, no solo los errores. Sirve para ver quién se ha vuelto ruidoso.",
+          "title": "Lines by container",
+          "description": "Everything each one writes, not just errors. Useful to spot who has gotten noisy.",
           "datasource": { "type": "loki", "uid": "loki" },
           "gridPos": { "h": 9, "w": 24, "x": 0, "y": 27 },
           "fieldConfig": {
@@ -178,7 +178,7 @@
               "refId": "A",
               "legendFormat": "{{container}}",
               "datasource": { "type": "loki", "uid": "loki" },
-              "expr": "sum by (container) (count_over_time({origen=\"docker\", container=~\"$contenedor\"} [15m]))",
+              "expr": "sum by (container) (count_over_time({source=\"docker\", container=~\"$container\"} [15m]))",
               "queryType": "range"
             }
           ]

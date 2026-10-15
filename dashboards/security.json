@@ -1,8 +1,8 @@
 {
-  "uid": "logs-seguridad",
-  "title": "Seguridad del servidor",
-  "description": "Quién golpea el servidor y quién entró de verdad. Los datos salen de /var/log del host, recogidos por Alloy.",
-  "tags": ["servidor", "seguridad"],
+  "uid": "logs-security",
+  "title": "Server security",
+  "description": "Who is knocking on the server and who actually got in. The data comes from the host's /var/log, collected by Alloy.",
+  "tags": ["server", "security"],
   "timezone": "utc",
   "editable": false,
   "schemaVersion": 39,
@@ -13,14 +13,14 @@
   "panels": [
     {
       "type": "row",
-      "title": "Lo que importa",
+      "title": "What matters",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "collapsed": false,
       "panels": []
     },
     {
       "type": "stat",
-      "title": "Contraseñas falladas (SSH)",
+      "title": "Failed passwords (SSH)",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
       "options": {
@@ -46,15 +46,15 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum(count_over_time({origen=\"host\", job=\"ssh\"} |= \"Failed password\" [$__range]))",
+          "expr": "sum(count_over_time({source=\"host\", job=\"ssh\"} |= \"Failed password\" [$__range]))",
           "queryType": "instant"
         }
       ]
     },
     {
       "type": "stat",
-      "title": "Usuarios inventados (SSH)",
-      "description": "Alguien probando nombres que no existen: admin, oracle, test… Es tanteo, no un error de quien sí tiene cuenta.",
+      "title": "Made-up users (SSH)",
+      "description": "Someone trying names that don't exist: admin, oracle, test… It's probing, not a typo from someone who has an account.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
       "options": {
@@ -80,14 +80,14 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum(count_over_time({origen=\"host\", job=\"ssh\"} |= \"Invalid user\" [$__range]))",
+          "expr": "sum(count_over_time({source=\"host\", job=\"ssh\"} |= \"Invalid user\" [$__range]))",
           "queryType": "instant"
         }
       ]
     },
     {
       "type": "stat",
-      "title": "Sondas al escritorio remoto",
+      "title": "Remote desktop probes",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
       "options": {
@@ -113,15 +113,15 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum(count_over_time({origen=\"host\", job=\"rdp\"} |= \"connection accepted\" [$__range]))",
+          "expr": "sum(count_over_time({source=\"host\", job=\"rdp\"} |= \"connection accepted\" [$__range]))",
           "queryType": "instant"
         }
       ]
     },
     {
       "type": "stat",
-      "title": "ENTRARON (accesos correctos)",
-      "description": "El único número de esta pantalla que puede significar que ya están dentro. Si no reconoces uno, cambia la contraseña.",
+      "title": "GOT IN (successful logins)",
+      "description": "The only number on this screen that can mean someone is already inside. If you don't recognize one, change the password.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
       "options": {
@@ -146,15 +146,15 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum(count_over_time({origen=\"host\", job=\"ssh\"} |= \"Accepted \" [$__range]))",
+          "expr": "sum(count_over_time({source=\"host\", job=\"ssh\"} |= \"Accepted \" [$__range]))",
           "queryType": "instant"
         }
       ]
     },
     {
       "type": "logs",
-      "title": "Accesos que SÍ funcionaron",
-      "description": "Cada línea es alguien que entró. Comprueba la IP: si no es tuya, ya no es un intento.",
+      "title": "Logins that DID work",
+      "description": "Each line is someone who got in. Check the IP: if it isn't yours, it's no longer an attempt.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
       "options": {
@@ -166,22 +166,22 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{origen=\"host\", job=\"ssh\"} |= \"Accepted \"",
+          "expr": "{source=\"host\", job=\"ssh\"} |= \"Accepted \"",
           "queryType": "range"
         }
       ]
     },
     {
       "type": "row",
-      "title": "Quién está llamando a la puerta",
+      "title": "Who is knocking at the door",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
       "collapsed": false,
       "panels": []
     },
     {
       "type": "timeseries",
-      "title": "Intentos por hora, por origen",
-      "description": "Un pico aquí es un escaneo. Una línea plana y constante es un bot insistiendo.",
+      "title": "Attempts per hour, by source",
+      "description": "A spike here is a scan. A flat, steady line is a bot that won't give up.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 8, "w": 14, "x": 0, "y": 15 },
       "fieldConfig": {
@@ -196,31 +196,31 @@
       "targets": [
         {
           "refId": "A",
-          "legendFormat": "SSH · contraseña fallada",
+          "legendFormat": "SSH · failed password",
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum(count_over_time({origen=\"host\", job=\"ssh\"} |= \"Failed password\" [1h]))",
+          "expr": "sum(count_over_time({source=\"host\", job=\"ssh\"} |= \"Failed password\" [1h]))",
           "queryType": "range"
         },
         {
           "refId": "B",
-          "legendFormat": "SSH · usuario inventado",
+          "legendFormat": "SSH · made-up user",
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum(count_over_time({origen=\"host\", job=\"ssh\"} |= \"Invalid user\" [1h]))",
+          "expr": "sum(count_over_time({source=\"host\", job=\"ssh\"} |= \"Invalid user\" [1h]))",
           "queryType": "range"
         },
         {
           "refId": "C",
-          "legendFormat": "Escritorio remoto",
+          "legendFormat": "Remote desktop",
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum(count_over_time({origen=\"host\", job=\"rdp\"} |= \"connection accepted\" [1h]))",
+          "expr": "sum(count_over_time({source=\"host\", job=\"rdp\"} |= \"connection accepted\" [1h]))",
           "queryType": "range"
         }
       ]
     },
     {
       "type": "logs",
-      "title": "Bloqueos de fail2ban",
-      "description": "Cada línea es una IP que se pasó de la raya y quedó fuera. Que esto tenga movimiento es buena señal: significa que algo está frenando.",
+      "title": "fail2ban bans",
+      "description": "Each line is an IP that crossed the line and got locked out. Activity here is a good sign: it means something is stopping them.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 8, "w": 10, "x": 14, "y": 15 },
       "options": {
@@ -232,15 +232,15 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{origen=\"host\", job=\"fail2ban\"} |~ \"Ban |Unban \"",
+          "expr": "{source=\"host\", job=\"fail2ban\"} |~ \"Ban |Unban \"",
           "queryType": "range"
         }
       ]
     },
     {
       "type": "logs",
-      "title": "Todo lo del host, en crudo",
-      "description": "SSH, escritorio remoto, fail2ban y cortafuegos juntos. Para cuando ya sabes qué buscas.",
+      "title": "Everything from the host, raw",
+      "description": "SSH, remote desktop, fail2ban and firewall together. For when you already know what you're looking for.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 10, "w": 24, "x": 0, "y": 23 },
       "options": {
@@ -252,7 +252,7 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{origen=\"host\"}",
+          "expr": "{source=\"host\"}",
           "queryType": "range"
         }
       ]

@@ -1,49 +1,47 @@
-//  Alloy: el que recoge los logs y se los pasa a Loki.
+//  Alloy: collects the logs and hands them to Loki.
 //
-// Dos fuentes, que son las dos mitades del problema:
+// Two sources, the two halves of the problem:
 //
-//   1. LOS CONTENEDORES (n8n, la API, nginx, los workers de adquisición).
-//   2. EL HOST (auth.log, xrdp.log, fail2ban.log, syslog, ufw.log). Son los
-//      que cuentan quién golpea la máquina, y viven fuera de todo contenedor.
+//   1. THE CONTAINERS (n8n, the API, nginx, the acquisition workers).
+//   2. THE HOST (auth.log, xrdp.log, fail2ban.log, syslog, ufw.log). These tell
+//      you who is knocking on the machine, and they live outside any container.
 //
-// Alloy monta /var/log, /var/lib/docker/containers y el socket de Docker en
-// SOLO LECTURA. No puede escribir en ninguno de los tres.
+// Alloy mounts /var/log, /var/lib/docker/containers and the Docker socket
+// READ-ONLY. It cannot write to any of the three.
 
 logging {
   level  = "warn"
   format = "logfmt"
 }
 
-// ── 1. contenedores ───────────────────────────────────────────────────────
+// ── 1. containers ─────────────────────────────────────────────────────────
 //
-// POR QUÉ SE LEEN LOS FICHEROS Y NO SE USA `loki.source.docker`
+// WHY WE READ THE FILES INSTEAD OF USING `loki.source.docker`
 //
-// Lo natural sería `loki.source.docker`, que pide los logs a la API de Docker.
-// Se probó y da un problema que no se va: cuando un contenedor se BORRA (cosa
-// que pasa en CADA despliegue de la web), su tailer sigue preguntando por él
-// cada cinco segundos y suelta
+// The obvious choice is `loki.source.docker`, which asks the Docker API for the
+// logs. We tried it and it has a problem that never goes away: when a container
+// is DELETED (which happens on EVERY deploy of the website), its tailer keeps
+// asking for it every five seconds and logs
 //
 //   level=error msg="error inspecting Docker container" ... No such container
 //
-// para siempre. Se intentó filtrar el descubrimiento a los contenedores en
-// marcha: no bastó, el tailer no depende del descubrimiento. Se subió Alloy de
-// v1.5.1 a v1.18.1: bajó el ritmo pero seguía, con cuatro contenedores muertos
-// en la lista a la vez.
+// forever. Filtering discovery to running containers wasn't enough: the tailer
+// doesn't depend on discovery. Upgrading Alloy from v1.5.1 to v1.18.1 slowed it
+// down, but it kept happening, with four dead containers on the list at once.
 //
-// Preguntarle a una API por algo borrado siempre va a dar error. Un FICHERO
-// que desaparece, en cambio, se maneja solo: el tailer se queda sin fuente y
-// calla. Docker escribe con el driver json-file, así que los logs ya están en
-// disco; se leen de ahí.
+// Asking an API about something deleted will always fail. A FILE that
+// disappears, on the other hand, handles itself: the tailer loses its source
+// and goes quiet. Docker writes with the json-file driver, so the logs are
+// already on disk; we read them from there.
 //
-// El descubrimiento de Docker se conserva SOLO para saber cómo se llama cada
-// contenedor: el fichero se llama por su id, y "website" se lee mucho mejor
-// que "74770e262a0f…".
-discovery.docker "contenedores" {
+// Docker discovery is kept ONLY to know each container's name: the file is
+// named after its id, and "website" reads much better than "74770e262a0f…".
+discovery.docker "containers" {
   host             = "unix:///var/run/docker.sock"
-  // 5 s y no 30 s: los pases cortos de `docker compose run --rm` (menos de
-  // 30 s) se descubrían cuando su contenedor ya estaba borrado, y Alloy los
-  // saltaba con "failed to create source": ~26 pases al día sin un solo log.
-  // Preguntar al socket local cada 5 s no cuesta nada.
+  // 5 s, not 30 s: short `docker compose run --rm` runs (under 30 s) were
+  // discovered after their container was already gone, and Alloy skipped them
+  // with "failed to create source": ~26 runs a day without a single log line.
+  // Polling the local socket every 5 s costs nothing.
   refresh_interval = "5s"
 
   filter {
@@ -52,17 +50,17 @@ discovery.docker "contenedores" {
   }
 }
 
-discovery.relabel "contenedores" {
-  targets = discovery.docker.contenedores.targets
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
 
-  // El nombre que da Docker viene como "/website"; la barra sobra al filtrar.
+  // Docker reports the name as "/website"; the slash gets in the way when filtering.
   rule {
     source_labels = ["__meta_docker_container_name"]
     regex         = "/(.*)"
     target_label  = "container"
   }
 
-  // La ruta del fichero de log, construida desde el id del contenedor.
+  // The log file path, built from the container id.
   rule {
     source_labels = ["__meta_docker_container_id"]
     regex         = "(.*)"
@@ -70,19 +68,19 @@ discovery.relabel "contenedores" {
     replacement   = "/var/lib/docker/containers/$1/$1-json.log"
   }
 
-  // Los workers de Fleet se arrancan con `docker compose run --rm`, y eso le
-  // pone a CADA pase un nombre nuevo: acquisition-worker-run-99ddd20ff847.
-  // Como el nombre es la etiqueta `container`, cada pase abría un flujo NUEVO
-  // en Loki. Con cortex-live y dvcr-live cada 7 min más packages cada 15, eso
-  // son ~300 flujos al día que no se repiten nunca.
+  // The Fleet workers are started with `docker compose run --rm`, which gives
+  // EVERY run a new name: acquisition-worker-run-99ddd20ff847. Since the name
+  // is the `container` label, each run opened a NEW stream in Loki. With
+  // cortex-live and dvcr-live every 7 min plus packages every 15, that's ~300
+  // streams a day that never repeat.
   //
-  // Loki indexa por etiquetas: miles de flujos de una línea cada uno hinchan
-  // el índice, parten los datos en trozos minúsculos y dejan inútil el
-  // desplegable de contenedores del panel (83 valores, 70 de ellos basura).
+  // Loki indexes by labels: thousands of one-line streams bloat the index,
+  // split the data into tiny chunks and make the dashboard's container
+  // dropdown useless (83 values, 70 of them junk).
   //
-  // Aquí se le quita el sufijo -run-<hash>: todos los pases del mismo worker
-  // caen en UN solo flujo, y se siguen distinguiendo por la hora de la línea.
-  // Si el nombre no lleva ese sufijo, la regla no casa y el nombre queda igual.
+  // Here the -run-<hash> suffix is stripped: every run of the same worker lands
+  // in ONE stream, still told apart by the line's timestamp. If the name has no
+  // such suffix, the rule doesn't match and the name stays as it is.
   rule {
     source_labels = ["container"]
     regex         = "(.*)-run-[0-9a-f]{8,}"
@@ -91,65 +89,65 @@ discovery.relabel "contenedores" {
   }
 
   rule {
-    target_label = "origen"
+    target_label = "source"
     replacement  = "docker"
   }
 }
 
-loki.source.file "contenedores" {
-  targets    = discovery.relabel.contenedores.output
+loki.source.file "containers" {
+  targets    = discovery.relabel.containers.output
   forward_to = [loki.process.docker.receiver]
 }
 
-// El fichero de Docker no es la línea del programa: es un JSON por línea con
-// la línea dentro. Sin esto, en Loki se vería el sobre y no la carta.
+// Docker's file isn't the program's line: it's one JSON object per line with
+// the line inside. Without this, Loki would show the envelope, not the letter.
 loki.process "docker" {
   forward_to = [loki.write.local.receiver]
 
   stage.json {
     expressions = {
-      salida = "log",
-      flujo  = "stream",
-      marca  = "time",
+      output = "log",
+      flow   = "stream",
+      ts     = "time",
     }
   }
 
-  // La hora REAL de la línea, no la de cuando Alloy la leyó. Importa al
-  // arrancar: si no, todo el histórico entraría fechado ahora mismo.
+  // The line's REAL time, not when Alloy read it. It matters on startup:
+  // otherwise the whole backlog would come in stamped "right now".
   stage.timestamp {
-    source = "marca"
+    source = "ts"
     format = "RFC3339Nano"
   }
 
   stage.labels {
-    values = { stream = "flujo" }
+    values = { stream = "flow" }
   }
 
   stage.output {
-    source = "salida"
+    source = "output"
   }
 
-  // `filename` es la ruta del json.log, que lleva el id del contenedor dentro.
-  // Para un contenedor efímero es un valor único por pase, igual que el nombre:
-  // la misma explosión de flujos por la otra puerta. Y no aporta nada, porque
-  // `container` ya dice de quién es la línea. Se cae SOLO en los contenedores;
-  // los ficheros del host (auth.log, syslog…) no pasan por aquí y la conservan,
-  // que ahí sí es la que los distingue.
+  // `filename` is the path of the json.log, which contains the container id.
+  // For a short-lived container it's unique per run, just like the name: the
+  // same stream explosion through the back door. And it adds nothing, because
+  // `container` already says whose line it is. It's dropped ONLY for
+  // containers; the host files (auth.log, syslog…) don't go through here and
+  // keep it, since there it's what tells them apart.
   stage.label_drop {
     values = ["filename"]
   }
 }
 
-// ── 2. ficheros del host ──────────────────────────────────────────────────
-// Las etiquetas van DENTRO de cada objetivo: loki.source.file no acepta un
-// bloque `labels` propio, y con él Alloy ni siquiera arranca.
+// ── 2. host files ─────────────────────────────────────────────────────────
+// The labels go INSIDE each target: loki.source.file doesn't accept its own
+// `labels` block, and with one Alloy won't even start.
 local.file_match "host" {
   path_targets = [
-    { __path__ = "/var/log/auth.log",     job = "ssh",      origen = "host" },
-    { __path__ = "/var/log/xrdp.log",     job = "rdp",      origen = "host" },
-    { __path__ = "/var/log/fail2ban.log", job = "fail2ban", origen = "host" },
-    { __path__ = "/var/log/syslog",       job = "syslog",   origen = "host" },
-    { __path__ = "/var/log/ufw.log",      job = "firewall", origen = "host" },
+    { __path__ = "/var/log/auth.log",     job = "ssh",      source = "host" },
+    { __path__ = "/var/log/xrdp.log",     job = "rdp",      source = "host" },
+    { __path__ = "/var/log/fail2ban.log", job = "fail2ban", source = "host" },
+    { __path__ = "/var/log/syslog",       job = "syslog",   source = "host" },
+    { __path__ = "/var/log/ufw.log",      job = "firewall", source = "host" },
   ]
 }
 

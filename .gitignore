@@ -1,7 +1,7 @@
-# Regla heredada de logs-web tras el incidente de una clave filtrada: NADA que
-# empiece por .env va al repositorio, aunque hoy no contenga un secreto. Es
-# mucho más fácil desapuntar un falso positivo que descubrir una clave
-# publicada. El ejemplo SÍ va, porque solo lleva nombres de variables.
+# Rule inherited from logs-web after the leaked-key incident: NOTHING that
+# starts with .env goes into the repo, even if it holds no secret today. It's
+# much easier to un-ignore a false positive than to discover a published key.
+# The example DOES go in, because it only has variable names.
 .env
 .env*
 !.env.example

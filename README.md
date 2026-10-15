@@ -63,7 +63,7 @@ GF_SECURITY_ADMIN_PASSWORD=A_LONG_PASSWORD_HERE
 ### Useful queries (Grafana → Explore)
 
 ```
-{origen="host", job="ssh"}   |= "Failed password"   # SSH login attempts
+{source="host", job="ssh"}   |= "Failed password"   # SSH login attempts
 {container="my-api"}         |= "error"              # errors from one container
 {container=~"n8n.*"}                                 # several containers at once
 ```
