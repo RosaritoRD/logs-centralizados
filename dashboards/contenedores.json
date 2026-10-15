@@ -1,0 +1,189 @@
+{
+  "uid": "logs-plataforma",
+  "title": "Contenedores",
+  "description": "Salud de los contenedores: quién escribe, quién se queja y qué dijo exactamente. Cubre la web, la API, n8n, los workers y el resto de proyectos de la VPS.",
+  "tags": ["servidor", "plataforma"],
+  "timezone": "utc",
+  "editable": false,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1m",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "contenedor",
+        "label": "Contenedor",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": { "label": "container", "refId": "var" },
+        "definition": "label_values(container)",
+        "refresh": 1,
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": true,
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Errores",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Líneas con error",
+      "description": "Solo líneas de NIVEL error (level=error, ERROR:, [error]). Buscar la palabra suelta contaba de más: Grafana escribe error=\"database is locked\" en líneas de nivel info, y salían 23 errores donde no había ninguno.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "colorMode": "value", "graphMode": "area", "textMode": "auto", "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "#E5A03D", "value": 50 },
+              { "color": "#E5484D", "value": 500 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({origen=\"docker\", container=~\"$contenedor\"} |~ \"(?i)(level=error|error:|\\\\[error\\\\])\" [$__range]))",
+          "queryType": "instant"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Contenedores escribiendo",
+      "description": "Si este número baja de golpe, algo dejó de arrancar.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "none", "graphMode": "area", "textMode": "auto", "justifyMode": "auto"
+      },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "count(sum by (container) (count_over_time({origen=\"docker\"} [$__range])))",
+          "queryType": "instant"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Líneas totales",
+      "description": "Volumen de logs del rango. Un salto sin motivo suele ser un bucle de reintentos.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "colorMode": "none", "graphMode": "area", "textMode": "auto", "justifyMode": "auto"
+      },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({origen=\"docker\", container=~\"$contenedor\"} [$__range]))",
+          "queryType": "instant"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Errores por contenedor",
+      "description": "Quién se está quejando y desde cuándo. Aquí es donde se ve qué empezó a fallar y a qué hora.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 6 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "bars", "fillOpacity": 70, "lineWidth": 1, "stacking": { "mode": "normal", "group": "A" } },
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["sum"] }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{container}}",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum by (container) (count_over_time({origen=\"docker\", container=~\"$contenedor\"} |~ \"(?i)(level=error|error:|\\\\[error\\\\])\" [15m]))",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Los errores, uno a uno",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 11, "w": 24, "x": 0, "y": 15 },
+      "options": {
+        "showTime": true, "showLabels": true, "showCommonLabels": false,
+        "wrapLogMessage": true, "prettifyLogMessage": false,
+        "enableLogDetails": true, "dedupStrategy": "exact", "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{origen=\"docker\", container=~\"$contenedor\"} |~ \"(?i)(level=error|error:|\\\\[error\\\\])\"",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Volumen",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "collapsed": true,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Líneas por contenedor",
+          "description": "Todo lo que escribe cada uno, no solo los errores. Sirve para ver quién se ha vuelto ruidoso.",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "gridPos": { "h": 9, "w": 24, "x": 0, "y": 27 },
+          "fieldConfig": {
+            "defaults": {
+              "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+              "color": { "mode": "palette-classic" },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": { "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["sum"] }, "tooltip": { "mode": "multi" } },
+          "targets": [
+            {
+              "refId": "A",
+              "legendFormat": "{{container}}",
+              "datasource": { "type": "loki", "uid": "loki" },
+              "expr": "sum by (container) (count_over_time({origen=\"docker\", container=~\"$contenedor\"} [15m]))",
+              "queryType": "range"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

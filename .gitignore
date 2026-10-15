@@ -1,0 +1,7 @@
+# Regla heredada de logs-web tras el incidente de una clave filtrada: NADA que
+# empiece por .env va al repositorio, aunque hoy no contenga un secreto. Es
+# mucho más fácil desapuntar un falso positivo que descubrir una clave
+# publicada. El ejemplo SÍ va, porque solo lleva nombres de variables.
+.env
+.env*
+!.env.example

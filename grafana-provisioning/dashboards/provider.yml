@@ -1,0 +1,19 @@
+#  carga los dashboards del directorio, en cada arranque.
+#
+# `allowUiUpdates: false`: el dashboard es un fichero del repo, no algo que se
+# edita en la interfaz y se pierde al recrear el contenedor. Para cambiarlo se
+# toca el JSON y se reinicia — así lo que se ve en pantalla y lo que está en
+# git son siempre lo mismo.
+apiVersion: 1
+
+providers:
+  - name: logs
+    orgId: 1
+    folder: Servidor
+    type: file
+    disableDeletion: false
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

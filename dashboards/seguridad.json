@@ -1,0 +1,261 @@
+{
+  "uid": "logs-seguridad",
+  "title": "Seguridad del servidor",
+  "description": "Quién golpea el servidor y quién entró de verdad. Los datos salen de /var/log del host, recogidos por Alloy.",
+  "tags": ["servidor", "seguridad"],
+  "timezone": "utc",
+  "editable": false,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Lo que importa",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Contraseñas falladas (SSH)",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "colorMode": "value", "graphMode": "area", "textMode": "auto", "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "#E5A03D", "value": 20 },
+              { "color": "#E5484D", "value": 100 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({origen=\"host\", job=\"ssh\"} |= \"Failed password\" [$__range]))",
+          "queryType": "instant"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Usuarios inventados (SSH)",
+      "description": "Alguien probando nombres que no existen: admin, oracle, test… Es tanteo, no un error de quien sí tiene cuenta.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "colorMode": "value", "graphMode": "area", "textMode": "auto", "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "#E5A03D", "value": 10 },
+              { "color": "#E5484D", "value": 50 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({origen=\"host\", job=\"ssh\"} |= \"Invalid user\" [$__range]))",
+          "queryType": "instant"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Sondas al escritorio remoto",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "colorMode": "value", "graphMode": "area", "textMode": "auto", "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "#E5A03D", "value": 20 },
+              { "color": "#E5484D", "value": 100 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({origen=\"host\", job=\"rdp\"} |= \"connection accepted\" [$__range]))",
+          "queryType": "instant"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "ENTRARON (accesos correctos)",
+      "description": "El único número de esta pantalla que puede significar que ya están dentro. Si no reconoces uno, cambia la contraseña.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "colorMode": "background", "graphMode": "none", "textMode": "auto", "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#1FA971", "value": null },
+              { "color": "#2F6BFF", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({origen=\"host\", job=\"ssh\"} |= \"Accepted \" [$__range]))",
+          "queryType": "instant"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Accesos que SÍ funcionaron",
+      "description": "Cada línea es alguien que entró. Comprueba la IP: si no es tuya, ya no es un intento.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
+      "options": {
+        "showTime": true, "showLabels": false, "showCommonLabels": false,
+        "wrapLogMessage": true, "prettifyLogMessage": false,
+        "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{origen=\"host\", job=\"ssh\"} |= \"Accepted \"",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Quién está llamando a la puerta",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Intentos por hora, por origen",
+      "description": "Un pico aquí es un escaneo. Una línea plana y constante es un bot insistiendo.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 14, "x": 0, "y": 15 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "bars", "fillOpacity": 60, "lineWidth": 1, "stacking": { "mode": "normal", "group": "A" } },
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "SSH · contraseña fallada",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({origen=\"host\", job=\"ssh\"} |= \"Failed password\" [1h]))",
+          "queryType": "range"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "SSH · usuario inventado",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({origen=\"host\", job=\"ssh\"} |= \"Invalid user\" [1h]))",
+          "queryType": "range"
+        },
+        {
+          "refId": "C",
+          "legendFormat": "Escritorio remoto",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({origen=\"host\", job=\"rdp\"} |= \"connection accepted\" [1h]))",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Bloqueos de fail2ban",
+      "description": "Cada línea es una IP que se pasó de la raya y quedó fuera. Que esto tenga movimiento es buena señal: significa que algo está frenando.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 15 },
+      "options": {
+        "showTime": true, "showLabels": false, "showCommonLabels": false,
+        "wrapLogMessage": true, "prettifyLogMessage": false,
+        "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{origen=\"host\", job=\"fail2ban\"} |~ \"Ban |Unban \"",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Todo lo del host, en crudo",
+      "description": "SSH, escritorio remoto, fail2ban y cortafuegos juntos. Para cuando ya sabes qué buscas.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 23 },
+      "options": {
+        "showTime": true, "showLabels": true, "showCommonLabels": false,
+        "wrapLogMessage": true, "prettifyLogMessage": false,
+        "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{origen=\"host\"}",
+          "queryType": "range"
+        }
+      ]
+    }
+  ]
+}

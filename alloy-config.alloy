@@ -1,0 +1,161 @@
+//  Alloy: el que recoge los logs y se los pasa a Loki.
+//
+// Dos fuentes, que son las dos mitades del problema:
+//
+//   1. LOS CONTENEDORES (n8n, la API, nginx, los workers de adquisición).
+//   2. EL HOST (auth.log, xrdp.log, fail2ban.log, syslog, ufw.log). Son los
+//      que cuentan quién golpea la máquina, y viven fuera de todo contenedor.
+//
+// Alloy monta /var/log, /var/lib/docker/containers y el socket de Docker en
+// SOLO LECTURA. No puede escribir en ninguno de los tres.
+
+logging {
+  level  = "warn"
+  format = "logfmt"
+}
+
+// ── 1. contenedores ───────────────────────────────────────────────────────
+//
+// POR QUÉ SE LEEN LOS FICHEROS Y NO SE USA `loki.source.docker`
+//
+// Lo natural sería `loki.source.docker`, que pide los logs a la API de Docker.
+// Se probó y da un problema que no se va: cuando un contenedor se BORRA (cosa
+// que pasa en CADA despliegue de la web), su tailer sigue preguntando por él
+// cada cinco segundos y suelta
+//
+//   level=error msg="error inspecting Docker container" ... No such container
+//
+// para siempre. Se intentó filtrar el descubrimiento a los contenedores en
+// marcha: no bastó, el tailer no depende del descubrimiento. Se subió Alloy de
+// v1.5.1 a v1.18.1: bajó el ritmo pero seguía, con cuatro contenedores muertos
+// en la lista a la vez.
+//
+// Preguntarle a una API por algo borrado siempre va a dar error. Un FICHERO
+// que desaparece, en cambio, se maneja solo: el tailer se queda sin fuente y
+// calla. Docker escribe con el driver json-file, así que los logs ya están en
+// disco; se leen de ahí.
+//
+// El descubrimiento de Docker se conserva SOLO para saber cómo se llama cada
+// contenedor: el fichero se llama por su id, y "website" se lee mucho mejor
+// que "74770e262a0f…".
+discovery.docker "contenedores" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "30s"
+
+  filter {
+    name   = "status"
+    values = ["running"]
+  }
+}
+
+discovery.relabel "contenedores" {
+  targets = discovery.docker.contenedores.targets
+
+  // El nombre que da Docker viene como "/website"; la barra sobra al filtrar.
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  // La ruta del fichero de log, construida desde el id del contenedor.
+  rule {
+    source_labels = ["__meta_docker_container_id"]
+    regex         = "(.*)"
+    target_label  = "__path__"
+    replacement   = "/var/lib/docker/containers/$1/$1-json.log"
+  }
+
+  // Los workers de Fleet se arrancan con `docker compose run --rm`, y eso le
+  // pone a CADA pase un nombre nuevo: acquisition-worker-run-99ddd20ff847.
+  // Como el nombre es la etiqueta `container`, cada pase abría un flujo NUEVO
+  // en Loki. Con cortex-live y dvcr-live cada 7 min más packages cada 15, eso
+  // son ~300 flujos al día que no se repiten nunca.
+  //
+  // Loki indexa por etiquetas: miles de flujos de una línea cada uno hinchan
+  // el índice, parten los datos en trozos minúsculos y dejan inútil el
+  // desplegable de contenedores del panel (83 valores, 70 de ellos basura).
+  //
+  // Aquí se le quita el sufijo -run-<hash>: todos los pases del mismo worker
+  // caen en UN solo flujo, y se siguen distinguiendo por la hora de la línea.
+  // Si el nombre no lleva ese sufijo, la regla no casa y el nombre queda igual.
+  rule {
+    source_labels = ["container"]
+    regex         = "(.*)-run-[0-9a-f]{8,}"
+    target_label  = "container"
+    replacement   = "$1"
+  }
+
+  rule {
+    target_label = "origen"
+    replacement  = "docker"
+  }
+}
+
+loki.source.file "contenedores" {
+  targets    = discovery.relabel.contenedores.output
+  forward_to = [loki.process.docker.receiver]
+}
+
+// El fichero de Docker no es la línea del programa: es un JSON por línea con
+// la línea dentro. Sin esto, en Loki se vería el sobre y no la carta.
+loki.process "docker" {
+  forward_to = [loki.write.local.receiver]
+
+  stage.json {
+    expressions = {
+      salida = "log",
+      flujo  = "stream",
+      marca  = "time",
+    }
+  }
+
+  // La hora REAL de la línea, no la de cuando Alloy la leyó. Importa al
+  // arrancar: si no, todo el histórico entraría fechado ahora mismo.
+  stage.timestamp {
+    source = "marca"
+    format = "RFC3339Nano"
+  }
+
+  stage.labels {
+    values = { stream = "flujo" }
+  }
+
+  stage.output {
+    source = "salida"
+  }
+
+  // `filename` es la ruta del json.log, que lleva el id del contenedor dentro.
+  // Para un contenedor efímero es un valor único por pase, igual que el nombre:
+  // la misma explosión de flujos por la otra puerta. Y no aporta nada, porque
+  // `container` ya dice de quién es la línea. Se cae SOLO en los contenedores;
+  // los ficheros del host (auth.log, syslog…) no pasan por aquí y la conservan,
+  // que ahí sí es la que los distingue.
+  stage.label_drop {
+    values = ["filename"]
+  }
+}
+
+// ── 2. ficheros del host ──────────────────────────────────────────────────
+// Las etiquetas van DENTRO de cada objetivo: loki.source.file no acepta un
+// bloque `labels` propio, y con él Alloy ni siquiera arranca.
+local.file_match "host" {
+  path_targets = [
+    { __path__ = "/var/log/auth.log",     job = "ssh",      origen = "host" },
+    { __path__ = "/var/log/xrdp.log",     job = "rdp",      origen = "host" },
+    { __path__ = "/var/log/fail2ban.log", job = "fail2ban", origen = "host" },
+    { __path__ = "/var/log/syslog",       job = "syslog",   origen = "host" },
+    { __path__ = "/var/log/ufw.log",      job = "firewall", origen = "host" },
+  ]
+}
+
+loki.source.file "host" {
+  targets    = local.file_match.host.targets
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

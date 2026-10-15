@@ -1,0 +1,61 @@
+#  Loki, el almacén de logs.
+#
+# Loki NO indexa el contenido de los logs, solo las etiquetas (contenedor,
+# host, fichero). Por eso cabe en esta VPS: un Elasticsearch indexando cada
+# palabra necesitaría varios GB, y aquí ya hay 2,6 GB en swap.
+#
+# Todo en disco local, sin dependencias externas.
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  # Solo la red interna de Docker lo alcanza; Grafana es quien lo consulta.
+  http_listen_address: 0.0.0.0
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2026-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # 30 días. Un log de hace dos meses no lo mira nadie y sí ocupa disco: hay
+  # 59 GB libres y esta máquina también guarda fotos de inspección.
+  retention_period: 720h
+  # Los contenedores escupen ráfagas al arrancar; sin esto Loki las rechaza.
+  ingestion_rate_mb: 8
+  ingestion_burst_size_mb: 16
+  reject_old_samples: true
+  # 720h y no 168h: los contenedores llevan semanas escribiendo, y en el primer
+  # arranque Alloy manda TODO ese histórico. Con 7 días, Loki devolvía 400 a
+  # cada lote y se perdía lo anterior. Igualado a la retención: se acepta todo
+  # lo que se va a conservar, ni un día más.
+  reject_old_samples_max_age: 720h
+  max_query_series: 5000
+
+compactor:
+  working_directory: /loki/compactor
+  delete_request_store: filesystem
+  retention_enabled: true
+  retention_delete_delay: 2h
+
+analytics:
+  reporting_enabled: false
