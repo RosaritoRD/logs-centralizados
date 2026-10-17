@@ -20,7 +20,7 @@ services:
   # file). That's why it fits here: an Elasticsearch indexing every word would
   # want 2-4 GB, and this VPS already has 2.6 GB in swap.
   loki:
-    image: grafana/loki:3.3.2
+    image: grafana/loki:3.6.18
     container_name: logs-loki
     restart: unless-stopped
     command: -config.file=/etc/loki/config.yaml
@@ -38,7 +38,7 @@ services:
   # the host files (/var/log). BOTH mounts are READ-ONLY: Alloy reads; it has no
   # business writing to /var/log or giving orders to the Docker daemon.
   alloy:
-    image: grafana/alloy:v1.18.1
+    image: grafana/alloy:v1.20.1
     container_name: logs-alloy
     restart: unless-stopped
     command:
@@ -68,7 +68,7 @@ services:
   # The visible face. It's the ONLY one of the three on the proxy network:
   # Loki and Alloy live on an internal network with no way out.
   grafana:
-    image: grafana/grafana:11.4.0
+    image: grafana/grafana:13.2.4  # upgraded 2026-10-16 from 11.4.0 (pre-upgrade backup kept outside the repo)
     container_name: logs-grafana
     restart: unless-stopped
     mem_limit: 384m

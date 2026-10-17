@@ -44,7 +44,7 @@ flowchart LR
 ## 🚀 Quick start
 
 ```bash
-git clone https://github.com/RosaritoRD/logs-centralizados.git
+git clone https://github.com/RosaritoRD/centralized-logs.git
 cd logs-centralizados
 cp .env.example .env          # set your proxy's network name
 # Create .env.grafana with your Grafana user and password (see below)
@@ -80,7 +80,7 @@ Open the folder with `claude` or `codex` and ask, for example: *"Add a panel wit
 See **[SAVINGS-AND-TIPS.md](SAVINGS-AND-TIPS.md)**.
 
 ## 🤝 Contributing
-Issues and PRs are welcome — look for the [`good first issue`](https://github.com/RosaritoRD/logs-centralizados/labels/good%20first%20issue) label and read [CONTRIBUTING.md](CONTRIBUTING.md).
+Issues and PRs are welcome — look for the [`good first issue`](https://github.com/RosaritoRD/centralized-logs/labels/good%20first%20issue) label and read [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## 📚 More
 📖 Guides and more projects: **[keizactech.com/docs](https://keizactech.com/docs)**
